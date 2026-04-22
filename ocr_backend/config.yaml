@@ -1,0 +1,29 @@
+server:
+  host: "0.0.0.0"
+  port: 8100
+  debug: true
+
+paths:
+  book_dir: "../.."
+  data_dir: "../data"
+  checkpoints_dir: "../checkpoints"
+
+ocr:
+  # 英文识别配置示例。如果只识别英文，可改回这一组：
+  # lang: "en"
+  # use_angle_cls: true
+  # show_log: false
+  # min_score: 0.0
+  # cls_model_dir: "../checkpoints/cls/ch_ppocr_mobile_v2.0_cls_infer"
+  # det_model_dir: "../checkpoints/det/en/en_PP-OCRv3_det_infer"
+  # rec_model_dir: "../checkpoints/rec/en/en_PP-OCRv4_rec_infer"
+  #
+  # 当前默认启用中文模型。PaddleOCR 的中文模型通常支持中文、英文、数字混合识别，
+  # 更适合教材页面里中英混排的场景。
+  lang: "ch"
+  use_angle_cls: true
+  show_log: false
+  min_score: 0.0
+  cls_model_dir: "../checkpoints/cls/ch_ppocr_mobile_v2.0_cls_infer"
+  det_model_dir: "../checkpoints/det/ch/ch_PP-OCRv4_det_infer"
+  rec_model_dir: "../checkpoints/rec/ch/ch_PP-OCRv4_rec_infer"

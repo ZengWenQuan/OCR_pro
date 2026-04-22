@@ -1,0 +1,16 @@
+[project]
+name = "book1811-ocr-project"
+version = "0.1.0"
+description = "Standalone OCR project for book1811."
+requires-python = ">=3.12"
+dependencies = [
+  "Flask==3.1.1",
+  "Flask-Cors==5.0.1",
+  "gunicorn==23.0.0",
+  "Pillow==11.3.0",
+  "paddleocr==2.9.1",
+  "pytest==8.4.1",
+]
+
+[tool.uv]
+package = false

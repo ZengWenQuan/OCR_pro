@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OCR 测试页</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="panel controls">
+        <h1>OCR 测试页</h1>
+        <label>
+          后端接口
+          <input id="apiBase" />
+        </label>
+        <label>
+          页面标识
+          <input id="pageId" value="appendices_page14" />
+        </label>
+        <label>
+          上传图片
+          <input id="imageInput" type="file" accept="image/*" />
+        </label>
+        <button id="submitBtn" type="button">开始识别</button>
+        <p id="statusText">等待上传图片</p>
+      </section>
+
+      <section class="panel viewer">
+        <div class="image-stage">
+          <img id="previewImage" alt="OCR 预览图" />
+          <div id="overlay"></div>
+        </div>
+      </section>
+
+      <section class="panel result">
+        <h2>点击文本框查看结果</h2>
+        <pre id="detailBox">暂无结果</pre>
+      </section>
+    </main>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

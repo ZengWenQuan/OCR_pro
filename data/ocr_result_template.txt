@@ -1,0 +1,2 @@
+音乐标示	英文内容	中文翻译	位置	行数	原生音频
+SoundName	Content	Chinese	Pos	Line	OSDAudio
