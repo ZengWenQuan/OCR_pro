@@ -1,5 +1,7 @@
 from io import BytesIO
 
+from fastapi.testclient import TestClient
+
 from ocr_backend.app import app
 
 
@@ -13,19 +15,15 @@ def test_ocr_endpoint_returns_json_error_when_engine_fails(monkeypatch):
             {"recognize": lambda self, image_bytes: (_ for _ in ()).throw(RuntimeError("boom"))},
         )(),
     )
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.post(
         "/ocr",
-        data={
-            "page_id": "appendices_page14",
-            "image_name": "page14.png",
-            "file": (BytesIO(b"fake-image"), "page14.png"),
-        },
-        content_type="multipart/form-data",
+        data={"page_id": "appendices_page14", "image_name": "page14.png"},
+        files={"file": ("page14.png", BytesIO(b"fake-image"), "image/png")},
     )
 
-    body = response.get_json()
+    body = response.json()
     assert response.status_code == 500
     assert body["error"] == "ocr_failed"
     assert "boom" in body["message"]
@@ -55,25 +53,38 @@ def test_ocr_endpoint_writes_txt_without_caching_image(monkeypatch):
             },
         )(),
     )
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.post(
         "/ocr",
-        data={
-            "page_id": "appendices_page14",
-            "image_name": "appendices_page14.jpg",
-            "file": (BytesIO(b"fake-image"), "appendices_page14.jpg"),
-        },
-        content_type="multipart/form-data",
+        data={"page_id": "appendices_page14", "image_name": "appendices_page14.jpg"},
+        files={"file": ("appendices_page14.jpg", BytesIO(b"fake-image"), "image/jpeg")},
     )
 
-    body = response.get_json()
+    body = response.json()
     assert response.status_code == 200
     assert body["cached"] is False
     assert body["rows"][0]["SoundName"] == "appendices_page14_audio1"
     assert body["rows"][0]["Content"] == "Where is Mum?"
     assert body["rows"][0]["Chinese"] == ""
     assert body["rows"][0]["OSDAudio"] == ""
+    assert body["results"] == [
+        {
+            "Txt": "Where is Mum?",
+            "Pos": {
+                "Top": 309,
+                "Left": 231,
+                "Width": 438,
+                "Height": 86,
+                "Points": [
+                    {"x": 231, "y": 309},
+                    {"x": 669, "y": 309},
+                    {"x": 669, "y": 395},
+                    {"x": 231, "y": 395},
+                ],
+            },
+        }
+    ]
     assert "image_path" not in body
     assert "image_url" not in body
 
@@ -101,18 +112,34 @@ def test_ocr_endpoint_reads_cached_txt_without_engine(monkeypatch):
         "ocr_backend.app.get_ocr_engine",
         lambda: (_ for _ in ()).throw(RuntimeError("should not be called")),
     )
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.post(
         "/ocr",
         data={"image_name": "appendices_page14.jpg", "page_id": "appendices_page14"},
-        content_type="multipart/form-data",
     )
 
-    body = response.get_json()
+    body = response.json()
     assert response.status_code == 200
     assert body["cached"] is True
     assert body["rows"][0]["SoundName"] == "appendices_page14_audio1"
+    assert body["results"] == [
+        {
+            "Txt": "Where is Mum?",
+            "Pos": {
+                "Top": 2,
+                "Left": 1,
+                "Width": 3,
+                "Height": 4,
+                "Points": [
+                    {"x": 1, "y": 2},
+                    {"x": 4, "y": 2},
+                    {"x": 4, "y": 6},
+                    {"x": 1, "y": 6},
+                ],
+            },
+        }
+    ]
     assert "image_path" not in body
     assert "image_url" not in body
 
@@ -136,19 +163,15 @@ def test_ocr_endpoint_keeps_uploaded_preview_on_cache_miss(monkeypatch):
             },
         )(),
     )
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.post(
         "/ocr",
-        data={
-            "image_name": "appendices_page14.jpg",
-            "page_id": "appendices_page14",
-            "file": (BytesIO(b"fake-image"), "appendices_page14.jpg"),
-        },
-        content_type="multipart/form-data",
+        data={"image_name": "appendices_page14.jpg", "page_id": "appendices_page14"},
+        files={"file": ("appendices_page14.jpg", BytesIO(b"fake-image"), "image/jpeg")},
     )
 
-    body = response.get_json()
+    body = response.json()
     assert response.status_code == 200
     assert body["cached"] is False
     assert body["rows"][0]["SoundName"] == "appendices_page14_audio1"
@@ -158,7 +181,7 @@ def test_ocr_endpoint_keeps_uploaded_preview_on_cache_miss(monkeypatch):
 
 
 def test_source_image_route_is_removed():
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.get("/source-image/appendices_page14.jpg")
 
@@ -167,15 +190,14 @@ def test_source_image_route_is_removed():
 
 def test_ocr_endpoint_requires_file_when_cache_misses(monkeypatch):
     monkeypatch.setattr("ocr_backend.app.read_result_txt", lambda stem: None)
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.post(
         "/ocr",
         data={"image_name": "appendices_page18.jpg", "page_id": "appendices_page18"},
-        content_type="multipart/form-data",
     )
 
-    body = response.get_json()
+    body = response.json()
     assert response.status_code == 400
     assert body["error"] == "missing file"
 
@@ -199,17 +221,31 @@ def test_ocr_endpoint_falls_back_to_uploaded_filename_when_image_name_missing(mo
             },
         )(),
     )
-    client = app.test_client()
+    client = TestClient(app)
 
     response = client.post(
         "/ocr",
-        data={
-            "page_id": "appendices_page18",
-            "file": (BytesIO(b"fake-image"), "appendices_page18.jpg"),
-        },
-        content_type="multipart/form-data",
+        data={"page_id": "appendices_page18"},
+        files={"file": ("appendices_page18.jpg", BytesIO(b"fake-image"), "image/jpeg")},
     )
 
-    body = response.get_json()
+    body = response.json()
     assert response.status_code == 200
     assert body["rows"][0]["SoundName"] == "appendices_page18_audio1"
+    assert body["results"] == [
+        {
+            "Txt": "Hello",
+            "Pos": {
+                "Top": 2,
+                "Left": 1,
+                "Width": 10,
+                "Height": 10,
+                "Points": [
+                    {"x": 1, "y": 2},
+                    {"x": 11, "y": 2},
+                    {"x": 11, "y": 12},
+                    {"x": 1, "y": 12},
+                ],
+            },
+        }
+    ]

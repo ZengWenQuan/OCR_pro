@@ -174,7 +174,7 @@ mkdir -p "$UV_CACHE_DIR"
   exec env \
     UV_CACHE_DIR="$UV_CACHE_DIR" \
     PYTHONPATH="$PROJECT_ROOT" \
-    "$UV_BIN" run python -m flask --app ocr_backend.app run --host 0.0.0.0 --port "$BACKEND_PORT"
+    "$UV_BIN" run python -m uvicorn ocr_backend.app:app --host 0.0.0.0 --port "$BACKEND_PORT"
 ) &
 BACKEND_PID=$!
 

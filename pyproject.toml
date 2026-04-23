@@ -4,13 +4,28 @@ version = "0.1.0"
 description = "Standalone OCR project for book1811."
 requires-python = ">=3.12"
 dependencies = [
-  "Flask==3.1.1",
-  "Flask-Cors==5.0.1",
+  "fastapi==0.115.12",
   "gunicorn==23.0.0",
   "Pillow==11.3.0",
   "paddleocr==2.9.1",
+  "paddlepaddle-gpu==3.2.0; sys_platform == 'linux'",
+  "python-multipart==0.0.20",
   "pytest==8.4.1",
+  "setuptools==82.0.1",
+  "httpx==0.28.1",
+  "uvicorn==0.34.2",
 ]
 
 [tool.uv]
 package = false
+environments = [
+  "sys_platform == 'linux'",
+]
+
+[tool.uv.sources]
+paddlepaddle-gpu = { index = "paddle-cu118" }
+
+[[tool.uv.index]]
+name = "paddle-cu118"
+url = "https://www.paddlepaddle.org.cn/packages/stable/cu118/"
+explicit = true

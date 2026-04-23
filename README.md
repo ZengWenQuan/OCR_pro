@@ -12,7 +12,7 @@
 
 ```
 OCR_pro/
-├── ocr_backend/          # Flask 后端：OCR 接口、缓存、配置
+├── ocr_backend/          # FastAPI 后端：OCR 接口、缓存、配置
 │   ├── app.py            # 入口，暴露 /health 和 /ocr
 │   ├── ocr_engine.py     # PaddleOCR 封装
 │   ├── storage.py        # OCR 结果读写
