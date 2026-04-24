@@ -1,8 +1,9 @@
+import asyncio
 from io import BytesIO
 
 from fastapi.testclient import TestClient
 
-from ocr_backend.app import app
+from ocr_backend.app import app, ocr
 
 
 def test_ocr_endpoint_returns_json_error_when_engine_fails(monkeypatch):
@@ -249,3 +250,71 @@ def test_ocr_endpoint_falls_back_to_uploaded_filename_when_image_name_missing(mo
             },
         }
     ]
+
+
+def test_ocr_function_supports_local_image_path(monkeypatch, tmp_path):
+    image_path = tmp_path / "appendices_page19.jpg"
+    image_path.write_bytes(b"fake-image")
+    seen = {}
+
+    class StubEngine:
+        def recognize(self, image_bytes):
+            seen["image_bytes"] = image_bytes
+            return [
+                {
+                    "text": "Hello",
+                    "score": 0.99,
+                    "points": [[1, 2], [11, 2], [11, 12], [1, 12]],
+                    "rect": {"left": 1, "top": 2, "width": 10, "height": 10},
+                }
+            ]
+
+    monkeypatch.setattr("ocr_backend.app.read_result_txt", lambda stem: None)
+    monkeypatch.setattr("ocr_backend.app.get_ocr_engine", lambda: StubEngine())
+    monkeypatch.setattr(
+        "ocr_backend.app.write_result_txt",
+        lambda stem, rows: tmp_path / f"{stem}.txt",
+    )
+
+    body = asyncio.run(ocr(file=str(image_path), image_name="", page_id=""))
+
+    assert seen["image_bytes"] == b"fake-image"
+    assert body["page_id"] == "appendices_page19"
+    assert body["cached"] is False
+    assert body["rows"][0]["SoundName"] == "appendices_page19_audio1"
+
+
+def test_ocr_function_supports_file_like_image(monkeypatch, tmp_path):
+    seen = {}
+
+    class FileLikeImage:
+        filename = "appendices_page20.jpg"
+
+        def read(self):
+            return b"file-like-image"
+
+    class StubEngine:
+        def recognize(self, image_bytes):
+            seen["image_bytes"] = image_bytes
+            return [
+                {
+                    "text": "Hi",
+                    "score": 0.98,
+                    "points": [[1, 2], [11, 2], [11, 12], [1, 12]],
+                    "rect": {"left": 1, "top": 2, "width": 10, "height": 10},
+                }
+            ]
+
+    monkeypatch.setattr("ocr_backend.app.read_result_txt", lambda stem: None)
+    monkeypatch.setattr("ocr_backend.app.get_ocr_engine", lambda: StubEngine())
+    monkeypatch.setattr(
+        "ocr_backend.app.write_result_txt",
+        lambda stem, rows: tmp_path / f"{stem}.txt",
+    )
+
+    body = asyncio.run(ocr(file=FileLikeImage(), image_name="", page_id=""))
+
+    assert seen["image_bytes"] == b"file-like-image"
+    assert body["page_id"] == "appendices_page20"
+    assert body["cached"] is False
+    assert body["rows"][0]["SoundName"] == "appendices_page20_audio1"

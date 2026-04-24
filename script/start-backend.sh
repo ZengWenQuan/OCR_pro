@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT_ENV_FILE="$PROJECT_ROOT/../../.env"
 UV_BIN="${UV_BIN:-/root/.local/bin/uv}"
 UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
@@ -17,8 +18,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  ./start-backend.sh
-  ./start-backend.sh --port 8101
+  ./script/start-backend.sh
+  ./script/start-backend.sh --port 8101
 EOF
 }
 

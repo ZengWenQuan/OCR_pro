@@ -2,13 +2,12 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 FRONTEND_DIR="$PROJECT_ROOT/ocr_frontend"
 FRONTEND_CONFIG_FILE="$FRONTEND_DIR/config.js"
 FRONTEND_SERVER="$FRONTEND_DIR/server.py"
 ROOT_ENV_FILE="$PROJECT_ROOT/../../.env"
-UV_BIN="${UV_BIN:-/root/.local/bin/uv}"
-UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
 BACKEND_PORT="8100"
 FRONTEND_PORT="8080"
 API_HOST="${API_HOST:-}"
@@ -22,8 +21,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  ./start-ocr.sh
-  ./start-ocr.sh --backend-port 8101 --frontend-port 8081
+  ./script/start-frontend.sh
+  ./script/start-frontend.sh --backend-port 8101 --port 8081
 EOF
 }
 
@@ -53,7 +52,6 @@ process_matches_ocr_project() {
 
 ensure_port_available() {
   local port="$1"
-  local label="$2"
   local pids
   local pid
   local remaining
@@ -63,11 +61,11 @@ ensure_port_available() {
     return
   fi
 
-  echo "$label port $port is already in use. Checking existing process..."
+  echo "Frontend port $port is already in use. Checking existing process..."
   while read -r pid; do
     [[ -z "$pid" ]] && continue
     if process_matches_ocr_project "$pid"; then
-      echo "Stopping existing OCR process on port $port (PID: $pid)"
+      echo "Stopping existing OCR frontend process on port $port (PID: $pid)"
       kill "$pid" >/dev/null 2>&1 || true
     else
       echo "Port $port is occupied by a non-OCR process (PID: $pid)." >&2
@@ -94,9 +92,9 @@ while [[ $# -gt 0 ]]; do
       BACKEND_PORT="$2"
       shift 2
       ;;
-    --frontend-port)
+    --port)
       if [[ $# -lt 2 ]]; then
-        echo "Missing value for --frontend-port" >&2
+        echo "Missing value for --port" >&2
         usage
         exit 1
       fi
@@ -144,44 +142,11 @@ window.OCR_APP_CONFIG = {
 };
 EOF
 
-if ! command -v "$UV_BIN" >/dev/null 2>&1; then
-  echo "uv not found at $UV_BIN" >&2
-  exit 1
-fi
+ensure_port_available "$FRONTEND_PORT"
 
-ensure_port_available "$BACKEND_PORT" "Backend"
-ensure_port_available "$FRONTEND_PORT" "Frontend"
-
-echo "Backend URL: http://$API_HOST:$BACKEND_PORT"
+echo "Backend URL for frontend: http://$API_HOST:$BACKEND_PORT"
 echo "Frontend URL: http://$API_HOST:$FRONTEND_PORT"
 echo "Web page: http://$API_HOST:$FRONTEND_PORT/index.html"
 
-cleanup() {
-  if [[ -n "${BACKEND_PID:-}" ]]; then
-    kill "$BACKEND_PID" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${FRONTEND_PID:-}" ]]; then
-    kill "$FRONTEND_PID" >/dev/null 2>&1 || true
-  fi
-}
-
-trap cleanup EXIT INT TERM
-
-mkdir -p "$UV_CACHE_DIR"
-
-(
-  cd "$PROJECT_ROOT"
-  exec env \
-    UV_CACHE_DIR="$UV_CACHE_DIR" \
-    PYTHONPATH="$PROJECT_ROOT" \
-    "$UV_BIN" run python -m uvicorn ocr_backend.app:app --host 0.0.0.0 --port "$BACKEND_PORT"
-) &
-BACKEND_PID=$!
-
-(
-  cd "$FRONTEND_DIR"
-  exec env PYTHONPATH="$PROJECT_ROOT" python "$FRONTEND_SERVER" --host 0.0.0.0 --port "$FRONTEND_PORT"
-) &
-FRONTEND_PID=$!
-
-wait -n "$BACKEND_PID" "$FRONTEND_PID"
+cd "$FRONTEND_DIR"
+exec env PYTHONPATH="$PROJECT_ROOT" python "$FRONTEND_SERVER" --host 0.0.0.0 --port "$FRONTEND_PORT"

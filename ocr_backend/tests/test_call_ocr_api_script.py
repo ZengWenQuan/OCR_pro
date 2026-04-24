@@ -59,6 +59,35 @@ def test_write_text_output_creates_txt_file(tmp_path):
     )
 
 
+def test_write_json_output_creates_json_file(tmp_path):
+    module = load_script_module()
+    payload = {
+        "count": 1,
+        "rows": [{"Content": "Hello"}],
+        "results": [{"Txt": "Hello"}],
+    }
+
+    output_path = tmp_path / "result.json"
+    module.write_json_output(output_path, payload)
+
+    assert output_path.exists()
+    assert output_path.read_text(encoding="utf-8") == (
+        '{\n'
+        '  "count": 1,\n'
+        '  "results": [\n'
+        '    {\n'
+        '      "Txt": "Hello"\n'
+        '    }\n'
+        '  ],\n'
+        '  "rows": [\n'
+        '    {\n'
+        '      "Content": "Hello"\n'
+        '    }\n'
+        '  ]\n'
+        '}\n'
+    )
+
+
 def test_draw_boxes_saves_annotated_image(tmp_path):
     module = load_script_module()
     image_path = tmp_path / "input.png"
@@ -85,7 +114,7 @@ def test_run_creates_text_and_preview_outputs(tmp_path, monkeypatch):
     module = load_script_module()
     image_path = tmp_path / "sample.png"
     Image.new("RGB", (100, 80), color="white").save(image_path)
-    output_dir = tmp_path / "tmp"
+    output_dir = tmp_path / "test"
 
     monkeypatch.setattr(
         module,
@@ -109,19 +138,29 @@ def test_run_creates_text_and_preview_outputs(tmp_path, monkeypatch):
                     "Points": [[30, 20], [55, 20], [55, 32], [30, 32]],
                 },
             ]
+            ,
+            "results": [
+                {"Txt": "Hello"},
+                {"Txt": "World"},
+            ],
         },
     )
 
-    text_path, preview_path = module.run(
+    json_path, text_path, preview_path = module.run(
         api_base="http://127.0.0.1:8100",
         image_path=image_path,
         output_dir=output_dir,
     )
 
+    assert json_path == output_dir / "sample_response.json"
     assert text_path == output_dir / "sample_ocr.txt"
     assert preview_path == output_dir / "sample_boxes.png"
+    assert json_path.exists()
     assert text_path.exists()
     assert preview_path.exists()
+    payload = json_path.read_text(encoding="utf-8")
+    assert '"results": [' in payload
+    assert '"Txt": "World"' in payload
     content = text_path.read_text(encoding="utf-8")
     assert "text: Hello" in content
     assert "score: 0.99" in content
@@ -148,7 +187,7 @@ def test_run_many_creates_outputs_for_multiple_images(tmp_path, monkeypatch):
     image_b = tmp_path / "sample_b.png"
     Image.new("RGB", (60, 40), color="white").save(image_a)
     Image.new("RGB", (70, 50), color="white").save(image_b)
-    output_dir = tmp_path / "tmp"
+    output_dir = tmp_path / "test"
 
     monkeypatch.setattr(
         module,
@@ -163,7 +202,8 @@ def test_run_many_creates_outputs_for_multiple_images(tmp_path, monkeypatch):
                     "PosRect": {"left": 5, "top": 5, "width": 20, "height": 10},
                     "Points": [[5, 5], [25, 5], [25, 15], [5, 15]],
                 }
-            ]
+            ],
+            "results": [{"Txt": image_path.stem}],
         },
     )
 
@@ -174,8 +214,22 @@ def test_run_many_creates_outputs_for_multiple_images(tmp_path, monkeypatch):
     )
 
     assert outputs == [
-        (output_dir / "sample_a_ocr.txt", output_dir / "sample_a_boxes.png"),
-        (output_dir / "sample_b_ocr.txt", output_dir / "sample_b_boxes.png"),
+        (
+            output_dir / "sample_a_response.json",
+            output_dir / "sample_a_ocr.txt",
+            output_dir / "sample_a_boxes.png",
+        ),
+        (
+            output_dir / "sample_b_response.json",
+            output_dir / "sample_b_ocr.txt",
+            output_dir / "sample_b_boxes.png",
+        ),
     ]
     assert "text: sample_a" in (output_dir / "sample_a_ocr.txt").read_text(encoding="utf-8")
     assert "text: sample_b" in (output_dir / "sample_b_ocr.txt").read_text(encoding="utf-8")
+
+
+def test_default_output_dir_is_test_folder():
+    module = load_script_module()
+
+    assert module.DEFAULT_OUTPUT_DIR == module.PROJECT_ROOT / "test"

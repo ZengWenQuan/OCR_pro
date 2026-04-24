@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess
 
 
-SCRIPT_PATH = Path(__file__).resolve().parents[2] / "setup-uv-env.sh"
+SCRIPT_PATH = Path(__file__).resolve().parents[2] / "script" / "setup-uv-env.sh"
 
 
 def test_setup_uv_env_skips_when_venv_exists(tmp_path):

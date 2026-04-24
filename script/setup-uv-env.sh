@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_ROOT="$(pwd)"
 VENV_DIR="$PROJECT_ROOT/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
@@ -9,8 +11,11 @@ VENV_CONFIG="$VENV_DIR/pyvenv.cfg"
 UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/uv-cache}"
 
 if [[ ! -f "$PROJECT_ROOT/pyproject.toml" ]]; then
-  echo "pyproject.toml not found in current directory: $PROJECT_ROOT" >&2
-  echo "Please run this script from the project root." >&2
+  PROJECT_ROOT="$DEFAULT_PROJECT_ROOT"
+fi
+
+if [[ ! -f "$PROJECT_ROOT/pyproject.toml" ]]; then
+  echo "pyproject.toml not found in project root: $PROJECT_ROOT" >&2
   exit 1
 fi
 
@@ -27,5 +32,6 @@ fi
 mkdir -p "$UV_CACHE_DIR"
 
 echo "Creating virtual environment with uv sync..."
+cd "$PROJECT_ROOT"
 UV_CACHE_DIR="$UV_CACHE_DIR" uv sync
 echo "Environment setup finished: .venv"

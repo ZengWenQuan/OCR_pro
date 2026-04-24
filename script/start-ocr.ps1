@@ -7,7 +7,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = Split-Path -Parent $ScriptDir
 $FrontendDir = Join-Path $ProjectRoot "ocr_frontend"
 $FrontendConfigFile = Join-Path $FrontendDir "config.js"
 $FrontendServer = Join-Path $FrontendDir "server.py"

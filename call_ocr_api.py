@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw
 DEFAULT_API_BASE = "http://127.0.0.1:8100"
 DEFAULT_TIMEOUT = 120
 PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "tmp"
+DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "test"
 
 
 def build_multipart_body(
@@ -88,6 +88,14 @@ def call_ocr_api(
         raise RuntimeError(f"OCR response is not valid JSON: {payload}") from exc
 
 
+def write_json_output(output_path: Path, payload: dict[str, object]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def write_text_output(output_path: Path, rows: list[dict[str, object]]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
@@ -139,7 +147,7 @@ def run(
     image_name: str | None = None,
     page_id: str | None = None,
     timeout: int = DEFAULT_TIMEOUT,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     payload = call_ocr_api(
         api_base=api_base,
         image_path=image_path,
@@ -153,13 +161,15 @@ def run(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = Path(image_name or image_path.name).stem
+    json_path = output_dir / f"{stem}_response.json"
     text_path = output_dir / f"{stem}_ocr.txt"
     preview_path = output_dir / f"{stem}_boxes.png"
 
+    write_json_output(json_path, payload)
     write_text_output(text_path, rows)
     draw_boxes(image_path, preview_path, rows)
 
-    return text_path, preview_path
+    return json_path, text_path, preview_path
 
 
 def run_many(
@@ -167,7 +177,7 @@ def run_many(
     image_paths: list[Path],
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     timeout: int = DEFAULT_TIMEOUT,
-) -> list[tuple[Path, Path]]:
+) -> list[tuple[Path, Path, Path]]:
     outputs = []
     for image_path in image_paths:
         outputs.append(
@@ -231,7 +241,8 @@ def main() -> int:
             output_dir=output_dir,
             timeout=args.timeout,
         )
-        for text_path, preview_path in outputs:
+        for json_path, text_path, preview_path in outputs:
+            print(f"JSON结果已保存: {json_path}")
             print(f"文本结果已保存: {text_path}")
             print(f"带框图片已保存: {preview_path}")
         return 0
@@ -243,7 +254,7 @@ def main() -> int:
     if not image_path.exists():
         raise SystemExit(f"图片不存在: {image_path}")
 
-    text_path, preview_path = run(
+    json_path, text_path, preview_path = run(
         api_base=args.api_base,
         image_path=image_path,
         output_dir=output_dir,
@@ -252,6 +263,7 @@ def main() -> int:
         timeout=args.timeout,
     )
 
+    print(f"JSON结果已保存: {json_path}")
     print(f"文本结果已保存: {text_path}")
     print(f"带框图片已保存: {preview_path}")
     return 0

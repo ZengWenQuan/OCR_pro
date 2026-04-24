@@ -5,9 +5,9 @@ setlocal enabledelayedexpansion
 ::  start-ocr.bat - Windows equivalent of start-ocr.sh
 :: ============================================================
 
-set "PROJECT_ROOT=%~dp0"
-:: Remove trailing backslash
-if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
+set "SCRIPT_DIR=%~dp0"
+if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\..") do set "PROJECT_ROOT=%%~fI"
 
 set "FRONTEND_DIR=%PROJECT_ROOT%\ocr_frontend"
 set "FRONTEND_CONFIG_FILE=%FRONTEND_DIR%\config.js"
@@ -127,7 +127,6 @@ if not exist "%UV_CACHE_DIR%" mkdir "%UV_CACHE_DIR%"
 start "OCR Backend" /b cmd /c "cd /d "%PROJECT_ROOT%" && set UV_CACHE_DIR=%UV_CACHE_DIR%&& set PYTHONPATH=%PROJECT_ROOT%&& "%UV_BIN%" run python -m flask --app ocr_backend.app run --host 0.0.0.0 --port %BACKEND_PORT%"
 set "BACKEND_PID=%errorlevel%"
 
-:: Small delay to let backend start
 timeout /t 2 /nobreak >nul
 
 :: ---- Start frontend ----
@@ -138,33 +137,25 @@ echo.
 echo OCR services started. Press Ctrl+C to stop both backend and frontend.
 echo.
 
-:: ---- Wait and cleanup ----
-:: On Ctrl+C, kill child processes
 :wait_loop
 timeout /t 60 /nobreak >nul
 goto :wait_loop
 
-:: ============================================================
-::  Subroutines
-:: ============================================================
-
 :usage
 echo Usage:
-echo   start-ocr.bat
-echo   start-ocr.bat --backend-port 8101 --frontend-port 8081
+echo   script\start-ocr.bat
+echo   script\start-ocr.bat --backend-port 8101 --frontend-port 8081
 goto :eof
 
 :validate_port
 set "p=%~1"
 set "label=%~2"
-:: Check it's numeric
 set "numeric=1"
 for /f "delims=0123456789" %%c in ("%p%") do set "numeric=0"
 if "%numeric%"=="0" (
     echo Invalid %label% port: %p% >&2
     exit /b 1
 )
-:: Check range 1-65535
 if %p% lss 1 (
     echo Invalid %label% port: %p% >&2
     exit /b 1
@@ -188,7 +179,6 @@ if "%found_pid%"=="" goto :eof
 
 echo %label% port %port% is already in use by PID %found_pid%.
 
-:: Try to check if it's our process
 set "is_ours=0"
 for /f "tokens=1,*" %%a in ('wmic process where "processid=%found_pid%" get commandline /format:list 2^>nul ^| findstr /i "%PROJECT_ROOT%"') do (
     set "is_ours=1"
@@ -199,7 +189,6 @@ if "%is_ours%"=="1" (
     taskkill /pid %found_pid% /f >nul 2>&1 || true
     timeout /t 2 /nobreak >nul
 
-    :: Re-check
     set "still_pid="
     for /f "tokens=5" %%a in ('netstat -ano ^| findstr /r ":%port% .*LISTENING" 2^>nul') do (
         set "still_pid=%%a"

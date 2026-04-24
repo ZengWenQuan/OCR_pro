@@ -29,10 +29,13 @@ OCR_pro/
 │   └── txt/              # OCR 结果缓存目录
 ├── checkpoints/          # PaddleOCR 模型目录（不入 Git）
 ├── pyproject.toml
-├── setup-uv-env.sh       # 一键配置环境
-├── start-backend.sh      # 启动后端
-├── start-frontend.sh     # 启动前端
-└── start-ocr.sh          # 一键启动前后端
+├── script/
+│   ├── setup-uv-env.sh   # 一键配置环境
+│   ├── start-backend.sh  # 启动后端
+│   ├── start-frontend.sh # 启动前端
+│   ├── start-ocr.sh      # 一键启动前后端
+│   ├── start-ocr.ps1     # Windows PowerShell 启动脚本
+│   └── start-ocr.bat     # Windows CMD 启动脚本
 ```
 
 ## 环境要求
@@ -46,7 +49,7 @@ OCR_pro/
 ### 1. 配置环境
 
 ```bash
-chmod +x setup-uv-env.sh && ./setup-uv-env.sh
+chmod +x script/setup-uv-env.sh && ./script/setup-uv-env.sh
 ```
 
 脚本会自动检查并创建 `.venv`，已有则跳过。
@@ -64,26 +67,26 @@ PYTHONPATH=. .venv/bin/python ocr_backend/download_models.py
 **一键启动（推荐）：**
 
 ```bash
-chmod +x start-ocr.sh && ./start-ocr.sh
+chmod +x script/start-ocr.sh && ./script/start-ocr.sh
 ```
 
 **分开启动：**
 
 ```bash
 # 终端 1 — 后端（默认端口 8100）
-./start-backend.sh
+./script/start-backend.sh
 
 # 终端 2 — 前端（默认端口 8080）
-./start-frontend.sh
+./script/start-frontend.sh
 ```
 
 自定义端口：
 
 ```bash
-./start-ocr.sh --backend-port 8101 --frontend-port 8081
+./script/start-ocr.sh --backend-port 8101 --frontend-port 8081
 # 或分开启动时：
-./start-backend.sh --port 8101
-./start-frontend.sh --backend-port 8101 --port 8081
+./script/start-backend.sh --port 8101
+./script/start-frontend.sh --backend-port 8101 --port 8081
 ```
 
 启动后访问：**http://127.0.0.1:8080/index.html**
@@ -92,22 +95,63 @@ chmod +x start-ocr.sh && ./start-ocr.sh
 
 编辑 `ocr_backend/config.yaml`：
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `server.host/port` | 后端监听地址和端口 | `0.0.0.0:8100` |
-| `paths.data_dir` | OCR 结果缓存目录 | `data/` |
-| `paths.checkpoints_dir` | 模型根目录 | `checkpoints/` |
-| `ocr.lang` | PaddleOCR 语言 | `ch`（支持中英混排） |
-| `ocr.*_model_dir` | 三个模型子目录 | 中文模型 |
+| 配置项                    | 说明               | 默认值                 |
+| ------------------------- | ------------------ | ---------------------- |
+| `server.host/port`      | 后端监听地址和端口 | `0.0.0.0:8100`       |
+| `paths.data_dir`        | OCR 结果缓存目录   | `data/`              |
+| `paths.checkpoints_dir` | 模型根目录         | `checkpoints/`       |
+| `ocr.lang`              | PaddleOCR 语言     | `ch`（支持中英混排） |
+| `ocr.*_model_dir`       | 三个模型子目录     | 中文模型               |
 
 > 项目默认使用中文模型，适合中英混排教材场景。纯英文页面可切换为英文模型，参见 `config.yaml` 中的注释。
 
 ## 接口
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/health` | 健康检查 |
-| POST | `/ocr` | OCR 识别（`multipart/form-data`，字段：`file`、`image_name`、`page_id`） |
+| 方法 | 路径        | 说明                                                                             |
+| ---- | ----------- | -------------------------------------------------------------------------------- |
+| GET  | `/health` | 健康检查                                                                         |
+| POST | `/ocr`    | OCR 识别（`multipart/form-data`，字段：`file`、`image_name`、`page_id`） |
+
+### 接口实现位置
+
+- 后端入口代码：[`ocr_backend/app.py`](/home/irving/workspace/myPartjob/book1811/OCR_pro/ocr_backend/app.py)
+- OCR 路由函数：`ocr_backend.app.ocr()`
+- OCR 推理封装：[`ocr_backend/ocr_engine.py`](/home/irving/workspace/myPartjob/book1811/OCR_pro/ocr_backend/ocr_engine.py) 里的 `OcrEngine.recognize()`
+
+### `/ocr` 接收参数
+
+- `file`：上传的图片文件，`multipart/form-data`
+- `image_name`：图片文件名，字符串，可选；不传时回退到上传文件名
+- `page_id`：页面标识，字符串，可选；不传时默认使用图片文件名 stem
+
+### `/ocr` 返回值
+
+- `page_id`：本次请求对应的页面标识
+- `count`：识别出的文本块数量
+- `txt_path`：缓存结果 txt 路径
+- `cached`：是否命中缓存
+- `rows`：当前项目内部使用的 OCR 结果格式，主要字段包括 `Content`、`Pos`、`Score`、`Points`、`PosRect`
+- `results`：阿里云兼容格式，主要字段为 `Txt` 和 `Pos	`
+
+其中 `results` 的单项结构为：
+
+```json
+{
+  "Txt": "Listen and repeat",
+  "Pos": {
+    "Top": 120,
+    "Left": 50,
+    "Width": 300,
+    "Height": 40,
+    "Points": [
+      {"x": 50, "y": 120},
+      {"x": 350, "y": 120},
+      {"x": 350, "y": 160},
+      {"x": 50, "y": 160}
+    ]
+  }
+}
+```
 
 `/ocr` 的处理逻辑很简单：
 
